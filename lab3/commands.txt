@@ -1,0 +1,159 @@
+$ gcc -c vector_math.c -o vector_math.o
+[exit: 0]
+
+$ ar rcs libmath_static.a vector_math.o
+[exit: 0]
+
+$ ar rcs libmath_static.a vector_math.o
+[exit: 0]
+
+$ ar t libmath_static.a
+vector_math.o
+[exit: 0]
+
+$ g++ -c main.cpp -o main.o
+[exit: 0]
+
+$ nm main.o
+                 U _GLOBAL_OFFSET_TABLE_
+                 U _ZNSolsEPFRSoS_E
+                 U _ZNSolsEi
+                 U _ZSt21ios_base_library_initv
+                 U _ZSt4cout
+                 U _ZSt4endlIcSt11char_traitsIcEERSt13basic_ostreamIT_T0_ES6_
+                 U _ZStlsISt11char_traitsIcEERSt13basic_ostreamIcT_ES5_PKc
+                 U __stack_chk_fail
+                 U dot_product
+                 U get_lib_version
+0000000000000000 T main
+[exit: 0]
+
+$ g++ main.o -L. -lmath_static -o app_static
+[exit: 0]
+
+$ ./app_static
+Library version: v2.4.1-release
+Dot product result: 32
+[exit: 0]
+
+$ gcc -c vector_math.c -o vector_math_nopic.o
+[exit: 0]
+
+$ gcc -shared -o libmath_broken.so vector_math_nopic.o
+[exit: 0]
+
+$ gcc -c -fPIC vector_math.c -o vector_math_pic.o
+[exit: 0]
+
+$ gcc -shared -o libmath_dynamic.so vector_math_pic.o
+[exit: 0]
+
+$ g++ main.o -L. -lmath_dynamic -o app_dynamic
+[exit: 0]
+
+$ size app_static app_dynamic
+   text	   data	    bss	    dec	    hex	filename
+   2549	    672	    280	   3501	    dad	app_static
+   2494	    696	    280	   3470	    d8e	app_dynamic
+[exit: 0]
+
+$ nm app_static app_dynamic | grep -E "dot_product|get_lib_version"
+0000000000001265 T dot_product
+0000000000001258 T get_lib_version
+                 U dot_product
+                 U get_lib_version
+[exit: 0]
+
+$ LD_LIBRARY_PATH=. ./app_dynamic
+Library version: v2.4.1-release
+Dot product result: 32
+[exit: 0]
+
+$ g++ -L. -lmath_dynamic main.o -o app_wrong_order
+[exit: 0]
+
+$ g++ main.o -L. -lmath_dynamic -o app_correct
+[exit: 0]
+
+$ LD_LIBRARY_PATH=. ./app_correct
+Library version: v2.4.1-release
+Dot product result: 32
+[exit: 0]
+
+$ g++ -c main.cpp -o main_no_extern.o
+[exit: 0]
+
+$ g++ main_no_extern.o -L. -lmath_dynamic -o app_no_extern
+/usr/bin/ld: main_no_extern.o: in function `main':
+main.cpp:(.text+0x5f): undefined reference to `get_lib_version()'
+/usr/bin/ld: main.cpp:(.text+0xb0): undefined reference to `dot_product(int const*, int const*, int)'
+collect2: error: ld returned 1 exit status
+[exit: 1]
+
+$ nm main_no_extern.o | grep -E "dot|get_lib"
+                 U _Z11dot_productPKiS0_i
+                 U _Z15get_lib_versionv
+[exit: 0]
+
+$ nm libmath_dynamic.so | grep -E "dot|get_lib"
+00000000000010f6 T dot_product
+00000000000010e9 T get_lib_version
+[exit: 0]
+
+$ g++ -Wl,--as-needed -L. -lmath_dynamic main.o -o app_wrong_as_needed
+/usr/bin/ld: main.o: in function `main':
+main.cpp:(.text+0x5f): undefined reference to `get_lib_version'
+/usr/bin/ld: main.cpp:(.text+0xb0): undefined reference to `dot_product'
+collect2: error: ld returned 1 exit status
+[exit: 1]
+
+$ g++ -Wl,--as-needed main.o -L. -lmath_dynamic -o app_correct_as_needed
+[exit: 0]
+
+$ LD_LIBRARY_PATH=. ./app_correct_as_needed
+Library version: v2.4.1-release
+Dot product result: 32
+[exit: 0]
+
+$ readelf -rW vector_math_nopic.o
+
+Relocation section '.rela.text' at offset 0x268 contains 1 entry:
+    Offset             Info             Type               Symbol's Value  Symbol's Name + Addend
+0000000000000007  0000000400000002 R_X86_64_PC32          0000000000000000 .data.rel.local - 4
+
+Relocation section '.rela.data.rel.local' at offset 0x280 contains 1 entry:
+    Offset             Info             Type               Symbol's Value  Symbol's Name + Addend
+0000000000000000  0000000300000001 R_X86_64_64            0000000000000000 .rodata + 0
+
+Relocation section '.rela.eh_frame' at offset 0x298 contains 2 entries:
+    Offset             Info             Type               Symbol's Value  Symbol's Name + Addend
+0000000000000020  0000000200000002 R_X86_64_PC32          0000000000000000 .text + 0
+0000000000000040  0000000200000002 R_X86_64_PC32          0000000000000000 .text + d
+[exit: 0]
+
+$ readelf -dW libmath_broken.so
+
+Dynamic section at offset 0x2e48 contains 20 entries:
+  Tag        Type                         Name/Value
+ 0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]
+ 0x000000000000000c (INIT)               0x1000
+ 0x000000000000000d (FINI)               0x1158
+ 0x0000000000000019 (INIT_ARRAY)         0x3e38
+ 0x000000000000001b (INIT_ARRAYSZ)       8 (bytes)
+ 0x000000000000001a (FINI_ARRAY)         0x3e40
+ 0x000000000000001c (FINI_ARRAYSZ)       8 (bytes)
+ 0x000000006ffffef5 (GNU_HASH)           0x2d0
+ 0x0000000000000005 (STRTAB)             0x3a0
+ 0x0000000000000006 (SYMTAB)             0x2f8
+ 0x000000000000000a (STRSZ)              135 (bytes)
+ 0x000000000000000b (SYMENT)             24 (bytes)
+ 0x0000000000000007 (RELA)               0x458
+ 0x0000000000000008 (RELASZ)             192 (bytes)
+ 0x0000000000000009 (RELAENT)            24 (bytes)
+ 0x000000006ffffffe (VERNEED)            0x438
+ 0x000000006fffffff (VERNEEDNUM)         1
+ 0x000000006ffffff0 (VERSYM)             0x428
+ 0x000000006ffffff9 (RELACOUNT)          4
+ 0x0000000000000000 (NULL)               0x0
+[exit: 0]
+
